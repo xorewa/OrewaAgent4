@@ -41,6 +41,37 @@ _EDIT_APPROVAL_REQUESTER: ContextVar[EditApprovalRequester | None] = ContextVar(
 )
 _PERMISSION_REQUEST_IDS = count(1)
 
+# Session-scoped edit approval cache.  When a user selects "allow_session" or
+# "allow_always" in the ACP permission dialog, all subsequent edits in this
+# process are auto-approved (except sensitive paths, which always ask).
+# Session/always approval is deliberately NOT per-path: the dominant use case
+# is an agent creating many new files, where a per-path cache would re-prompt
+# on every file and defeat the option entirely.
+_EDIT_SESSION_APPROVE_ALL = False
+
+# "Allow always" additionally persists across restarts via a small state file.
+_EDIT_ALWAYS_STATE_FILE = Path.home() / ".hermes" / "acp_edit_approval.json"
+
+
+def _always_approve_edits() -> bool:
+    try:
+        if _EDIT_ALWAYS_STATE_FILE.is_file():
+            data = json.loads(_EDIT_ALWAYS_STATE_FILE.read_text(encoding="utf-8"))
+            return bool(data.get("always_allow_edits"))
+    except Exception:
+        logger.debug("Could not read ACP edit approval state file", exc_info=True)
+    return False
+
+
+def _persist_always_approve_edits() -> None:
+    try:
+        _EDIT_ALWAYS_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _EDIT_ALWAYS_STATE_FILE.write_text(
+            json.dumps({"always_allow_edits": True}), encoding="utf-8"
+        )
+    except Exception:
+        logger.warning("Could not persist ACP edit always-approval", exc_info=True)
+
 
 SENSITIVE_AUTO_APPROVE_NAMES = {".env", ".env.local", ".env.production", "id_rsa", "id_ed25519"}
 AUTO_APPROVE_ASK = "ask"
@@ -287,12 +318,14 @@ def make_acp_edit_approval_requester(
     request_permission_fn: Callable,
     loop: asyncio.AbstractEventLoop,
     session_id: str,
-    timeout: float = 60.0,
+    timeout: float = 300.0,
     auto_approve_getter: Callable[[], tuple[str, str | None]] | None = None,
 ) -> EditApprovalRequester:
     """Return a sync requester that bridges edit proposals to ACP permissions."""
 
     def _requester(proposal: EditProposal) -> bool:
+        global _EDIT_SESSION_APPROVE_ALL
+
         from acp.schema import PermissionOption
         from agent.async_utils import safe_schedule_threadsafe
 
@@ -305,8 +338,28 @@ def make_acp_edit_approval_requester(
             except Exception:
                 logger.debug("ACP edit auto-approval policy check failed", exc_info=True)
 
+        # Session/always approval covers everything except sensitive paths,
+        # which must always ask regardless of prior grants.
+        if not _is_sensitive_auto_approve_path(proposal.path):
+            if _EDIT_SESSION_APPROVE_ALL:
+                logger.debug("Session-approved ACP edit: %s", proposal.path)
+                return True
+            if _always_approve_edits():
+                logger.debug("Always-approved ACP edit: %s", proposal.path)
+                return True
+
         options = [
             PermissionOption(option_id="allow_once", kind="allow_once", name="Allow edit"),
+            PermissionOption(
+                option_id="allow_session",
+                kind="allow_always",
+                name="Allow for session",
+            ),
+            PermissionOption(
+                option_id="allow_always",
+                kind="allow_always",
+                name="Allow always",
+            ),
             PermissionOption(option_id="deny", kind="reject_once", name="Deny"),
         ]
         tool_call = build_acp_edit_tool_call(proposal)
@@ -330,9 +383,22 @@ def make_acp_edit_approval_requester(
             logger.warning("Edit approval request timed out or failed: %s", exc)
             return False
         outcome = getattr(response, "outcome", None)
-        return (
-            getattr(outcome, "outcome", None) == "selected"
-            and getattr(outcome, "option_id", None) == "allow_once"
-        )
+        option_id = getattr(outcome, "option_id", None)
+        selected = getattr(outcome, "outcome", None) == "selected"
+        if selected and option_id == "allow_once":
+            return True
+        if selected and option_id == "allow_session":
+            _EDIT_SESSION_APPROVE_ALL = True
+            logger.info(
+                "Session-approved ACP edits (triggered by: %s)", proposal.path
+            )
+            return True
+        if selected and option_id == "allow_always":
+            _persist_always_approve_edits()
+            logger.info(
+                "Always-approved ACP edits (triggered by: %s)", proposal.path
+            )
+            return True
+        return False
 
     return _requester

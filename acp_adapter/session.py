@@ -181,6 +181,9 @@ class SessionState:
     runtime_lock: Any = field(default_factory=Lock)
     current_prompt_text: str = ""
     interrupted_prompt_text: str = ""
+    # time.monotonic() of the most recent cancel() for this session; consumed
+    # by the zombie-turn watchdog in prompt() (0.0 = never cancelled).
+    cancel_requested_at: float = 0.0
 
 
 class SessionManager:

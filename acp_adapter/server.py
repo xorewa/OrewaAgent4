@@ -9,6 +9,10 @@ import contextvars
 import json
 import logging
 import os
+import sys
+import threading
+import time
+import traceback
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -1212,12 +1216,100 @@ class HermesACPAgent(acp.Agent):
             ),
         )
 
+    # Grace period between a client cancel and force-recovery of a turn whose
+    # agent thread never returned. Generous on purpose: post-interrupt cleanup
+    # (tool teardown, session persist, plugin hooks) can legitimately take a
+    # while, and a false-positive recovery risks racing a live agent thread.
+    _CANCEL_ZOMBIE_GRACE_SECONDS = 120.0
+    _WATCHDOG_POLL_SECONDS = 15.0
+
+    @staticmethod
+    def _dump_all_thread_stacks(reason: str) -> None:
+        """Log a Python stack for every live thread (in-process, no ptrace).
+
+        Fired by the zombie-turn watchdog so a wedged agent thread leaves the
+        exact blocked frames in the log instead of requiring a debugger attach
+        on a live process.
+        """
+        try:
+            frames = sys._current_frames()
+            names = {t.ident: t.name for t in threading.enumerate()}
+            parts = [f"THREAD STACK DUMP ({reason}):"]
+            for ident, frame in frames.items():
+                parts.append(
+                    f"\n--- Thread {names.get(ident, '?')} (ident {ident}) ---\n"
+                    + "".join(traceback.format_stack(frame))
+                )
+            logger.error("%s", "\n".join(parts))
+        except Exception:
+            logger.exception("Failed to dump thread stacks")
+
+    async def _await_agent_with_cancel_watchdog(
+        self,
+        agent_future,
+        state: SessionState,
+        session_id: str,
+    ) -> dict:
+        """Await the agent turn, force-recovering if it wedges after a cancel.
+
+        Regression guard for the bricked-session failure mode: a client cancel
+        interrupts the running tool, but the agent thread then blocks forever
+        somewhere in post-interrupt cleanup. ``state.is_running`` never clears,
+        so every subsequent prompt queues eternally and the session is dead
+        until the process restarts. If the agent thread has not returned within
+        the grace period after a cancel, dump all thread stacks for diagnosis,
+        detach from the zombie turn, and return a synthetic interrupted result
+        so the session recovers.
+        """
+        stacks_dumped = False
+        while True:
+            try:
+                return await asyncio.wait_for(
+                    asyncio.shield(agent_future), timeout=self._WATCHDOG_POLL_SECONDS
+                )
+            except asyncio.TimeoutError:
+                cancelled_at = getattr(state, "cancel_requested_at", 0.0)
+                if not (state.cancel_event and state.cancel_event.is_set()) or not cancelled_at:
+                    continue  # normal long-running turn, keep waiting
+                overdue = time.monotonic() - cancelled_at
+                if overdue < self._CANCEL_ZOMBIE_GRACE_SECONDS:
+                    continue
+                if not stacks_dumped:
+                    stacks_dumped = True
+                    self._dump_all_thread_stacks(
+                        f"session {session_id} agent thread still running "
+                        f"{overdue:.0f}s after cancel"
+                    )
+                    # One extra poll interval after the dump before detaching,
+                    # in case the dump raced a turn that was just finishing.
+                    continue
+                logger.error(
+                    "Zombie turn on session %s: agent thread did not return "
+                    "%.0fs after cancel — detaching and recovering the session.",
+                    session_id,
+                    overdue,
+                )
+                # Detach the shared history list so the zombie thread's late
+                # writes can't corrupt the history the next turn builds on.
+                with state.runtime_lock:
+                    state.history = list(state.history)
+                return {
+                    "final_response": "",
+                    "messages": None,
+                    "interrupted": True,
+                    "zombie_turn_recovered": True,
+                }
+
     async def cancel(self, session_id: str, **kwargs: Any) -> None:
         state = self.session_manager.get_session(session_id)
         if state and state.cancel_event:
             with state.runtime_lock:
                 if state.is_running and state.current_prompt_text:
                     state.interrupted_prompt_text = state.current_prompt_text
+            # Timestamp for the zombie-turn watchdog in prompt(): if the agent
+            # thread fails to finish within a grace period after this cancel,
+            # the turn is force-recovered instead of bricking the session.
+            state.cancel_requested_at = time.monotonic()
             state.cancel_event.set()
             try:
                 if getattr(state, "agent", None) and hasattr(state.agent, "interrupt"):
@@ -1559,7 +1651,11 @@ class HermesACPAgent(acp.Agent):
             # stomp on each other's ContextVar writes (HERMES_SESSION_KEY in
             # particular — used by the interactive sudo password cache scope).
             ctx = contextvars.copy_context()
-            result = await loop.run_in_executor(_executor, ctx.run, _run_agent)
+            result = await self._await_agent_with_cancel_watchdog(
+                loop.run_in_executor(_executor, ctx.run, _run_agent),
+                state,
+                session_id,
+            )
         except Exception:
             logger.exception("Executor error for session %s", session_id)
             with state.runtime_lock:
