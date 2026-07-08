@@ -1,0 +1,30 @@
+# OrewaAgent4 — default model: GLM-5.2. Pick any model from the panel's
+# model picker; the active model just starts from here. setup-orewa.sh copies
+# this to ~/.orewa4/config.yaml on first install. Put the API key in
+# ~/.orewa4/.env  ->  GLM_API_KEY=...
+
+model:
+  default: glm-5.2
+  provider: zai
+  base_url: https://api.z.ai/api/coding/paas/v4
+
+agent:
+  max_turns: 150
+  reasoning_effort: medium
+
+# Per-provider request timeout — the real fix for slow-model API timeouts.
+providers:
+  zai:
+    request_timeout_seconds: 1800   # 30 min
+    stale_timeout_seconds: 300      # abort only if no data for 5 min
+
+streaming:
+  enabled: true
+
+terminal:
+  timeout: 600
+code_execution:
+  timeout: 600
+  max_tool_calls: 200
+delegation:
+  max_iterations: 200

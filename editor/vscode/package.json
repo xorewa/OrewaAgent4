@@ -1,0 +1,121 @@
+{
+  "name": "orewa-agent-4",
+  "displayName": "Orewa Agent 4",
+  "description": "VS Code sidebar for OrewaAgent4 \u2014 an isolated Hermes agent instance with its own ~/.orewa4 home. Runs side by side with the Hermes/MiMo, GLM, and other Orewa panels. Communicates over ACP.",
+  "version": "3.0.5",
+  "publisher": "joaompfp",
+  "author": "joao",
+  "license": "MIT",
+  "keywords": [
+    "ai agent",
+    "coding assistant",
+    "autonomous agent",
+    "claude",
+    "codex",
+    "copilot alternative",
+    "pair programmer",
+    "llm",
+    "tool use",
+    "chat",
+    "hermes",
+    "acp",
+    "agent client protocol",
+    "sidebar chat",
+    "streaming",
+    "remote ssh"
+  ],
+  "homepage": "https://github.com/joaompfp/hermes-vscode",
+  "bugs": {
+    "url": "https://github.com/joaompfp/hermes-vscode/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joaompfp/hermes-vscode"
+  },
+  "icon": "resources/hermes-logo-128.png",
+  "galleryBanner": {
+    "color": "#1f1f1f",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "categories": [
+    "AI",
+    "Chat",
+    "Machine Learning",
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "qna": "https://github.com/joaompfp/hermes-vscode/issues",
+  "contributes": {
+    "commands": [
+      {
+        "command": "orewa4.openChat",
+        "title": "Orewa Agent 4: Open Chat"
+      },
+      {
+        "command": "orewa4.newSession",
+        "title": "Orewa Agent 4: New Session"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "orewa4",
+          "title": "Orewa Agent 4",
+          "icon": "resources/hermes-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "orewa4": [
+        {
+          "type": "webview",
+          "id": "orewa4.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Orewa Agent 4",
+      "properties": {
+        "orewa4.path": {
+          "type": "string",
+          "default": "hermes",
+          "scope": "machine-overridable",
+          "description": "Trusted absolute path to the Hermes binary (shared agent, run against the ~/.orewa4 home)."
+        },
+        "orewa4.debugLogs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable diagnostic ACP logs in the Orewa Agent 4 output channel."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/dompurify": "^3.0.5",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.3.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "dompurify": "^3.3.3",
+    "marked": "^17.0.5"
+  }
+}
