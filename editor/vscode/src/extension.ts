@@ -333,8 +333,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.StatusBarAlignment.Right,
     100,
   );
-  statusItem.text = '$(circle-outline) Hermes';
+  statusItem.text = '$(circle-outline) Orewa4';
   statusItem.command = 'orewa4.openChat';
+  statusItem.tooltip = 'OrewaAgent4 (GLM-5.2) — click to open';
   statusItem.show();
   context.subscriptions.push(statusItem);
 
@@ -344,7 +345,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       disconnected: '$(circle-outline)',
       connecting: '$(loading~spin)',
     };
-    statusItem.text = `${icons[state]} Hermes`;
+    statusItem.text = `${icons[state]} Orewa4`;
     panel.post({ type: 'status', status: state });
   }
 
