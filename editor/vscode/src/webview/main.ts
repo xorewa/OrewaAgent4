@@ -164,6 +164,10 @@ function send(): void {
     S.pendingSlashResponse = isSlash;
     if (!isSlash) showWaiting(messagesEl);
   } else {
+    // Busy: render the user's bubble immediately so their message is always
+    // visible right after Enter. Previously it was deferred until the queued
+    // turn started, so a slow/stuck turn made the typed message appear to vanish.
+    if (!isSlash) appendMessage(messagesEl, 'user', text);
     S.pendingQueuedTexts.push(text);
   }
   vscode.postMessage({ type: 'send', text });
@@ -416,7 +420,8 @@ window.addEventListener('message', (e: MessageEvent) => {
     case 'busy': {
       const newQueued = msg.queued ?? 0;
       if (msg.active && newQueued < S.prevQueueCount) {
-        if (S.pendingQueuedTexts.length > 0) appendMessage(messagesEl, 'user', S.pendingQueuedTexts.shift()!);
+        // Bubble already rendered immediately at send time; just drain the queue entry.
+        if (S.pendingQueuedTexts.length > 0) S.pendingQueuedTexts.shift();
         S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.pendingText = '';
         showWaiting(messagesEl);
       }

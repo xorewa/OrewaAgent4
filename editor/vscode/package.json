@@ -2,7 +2,7 @@
   "name": "orewa-agent-4",
   "displayName": "Orewa Agent 4",
   "description": "VS Code sidebar for OrewaAgent4 \u2014 an isolated Hermes agent instance with its own ~/.orewa4 home. Runs side by side with the Hermes/MiMo, GLM, and other Orewa panels. Communicates over ACP.",
-  "version": "3.0.6",
+  "version": "3.0.7",
   "publisher": "joaompfp",
   "author": "joao",
   "license": "MIT",

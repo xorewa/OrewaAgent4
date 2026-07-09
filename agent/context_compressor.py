@@ -1180,6 +1180,17 @@ class ContextCompressor(ContextEngine):
         tokens = prompt_tokens if prompt_tokens is not None else self.last_prompt_tokens
         if tokens < self.threshold_tokens:
             return False
+        # EMERGENCY OVERRIDE — fixes the live-session wedge (anti-thrash catch-22).
+        # When context is near the model window, compression MUST run regardless
+        # of the cooldown / anti-thrash gates below. Skipping here guarantees an
+        # over-window request that blocks the turn forever, and the anti-thrash
+        # counter can never reset because it needs a successful compression it is
+        # itself blocking. A bounded thrash near the ceiling is strictly better
+        # than a permanent wedge; the tool-output pre-pass reduces tokens even if
+        # the summary LLM is unavailable. This restores the CLI-resume behavior
+        # (which starts with a fresh counter) for long-lived ACP sessions.
+        if self.context_length and tokens >= int(self.context_length * 0.90):
+            return True
         # Do not trigger compression while the summary LLM is in cooldown.
         # On a 429/transient failure _generate_summary() sets a cooldown and
         # returns None; compress() then inserts a static fallback marker and
