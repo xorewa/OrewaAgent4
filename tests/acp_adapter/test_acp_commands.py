@@ -67,6 +67,23 @@ def make_agent_and_state():
     return acp_agent, state, fake, conn
 
 
+@pytest.mark.asyncio
+async def test_acp_prompt_refreshes_session_cwd_before_running():
+    acp_agent, state, fake, _conn = make_agent_and_state()
+    assert state.cwd == "."
+
+    response = await acp_agent.prompt(
+        session_id=state.session_id,
+        prompt=[TextContentBlock(type="text", text="edit the sibling repo")],
+        cwd="/tmp/orewa-current-workspace",
+    )
+
+    assert response.stop_reason == "end_turn"
+    assert state.cwd == "/tmp/orewa-current-workspace"
+    assert getattr(state.agent, "session_cwd", "") == "/tmp/orewa-current-workspace"
+    assert fake.runs == ["edit the sibling repo"]
+
+
 def test_acp_real_agent_gets_session_db_for_recall(monkeypatch):
     """ACP sessions persist to SessionDB; recall must receive the same DB handle."""
     captured = {}

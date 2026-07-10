@@ -364,6 +364,10 @@ class SessionManager:
         if state is None:
             return None
         state.cwd = cwd
+        try:
+            state.agent.session_cwd = cwd
+        except Exception:
+            logger.debug("Failed to update ACP agent session_cwd", exc_info=True)
         _register_task_cwd(session_id, cwd)
         self._persist(state)
         return state

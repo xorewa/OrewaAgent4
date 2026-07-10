@@ -1413,6 +1413,13 @@ class HermesACPAgent(acp.Agent):
             logger.error("prompt: session %s not found", session_id)
             return PromptResponse(stop_reason="refusal")
 
+        prompt_cwd = str(kwargs.get("cwd") or "").strip()
+        if prompt_cwd and prompt_cwd != state.cwd:
+            updated_state = self.session_manager.update_cwd(session_id, prompt_cwd)
+            if updated_state is not None:
+                state = updated_state
+                logger.info("Prompt refreshed session %s cwd=%s", session_id, state.cwd)
+
         user_text = _extract_text(prompt).strip()
         user_content = _content_blocks_to_openai_user_content(prompt)
         text_only_prompt = all(isinstance(block, TextContentBlock) for block in prompt)

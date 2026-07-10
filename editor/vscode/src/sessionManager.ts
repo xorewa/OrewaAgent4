@@ -156,6 +156,7 @@ export class SessionManager {
         .call('session/prompt', {
           sessionId,
           prompt: [{ type: 'text', text }],
+          cwd,
         })
         .then((result) => {
           promptResponse = (result as Record<string, unknown>) ?? {};
