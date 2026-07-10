@@ -235,7 +235,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const orewaHome = path.join(os.homedir(), '.orewa4');
   client = new AcpClient(
     hermesPath,
-    { HERMES_HOME: orewaHome, ...(debugLogs ? { HERMES_LOG_LEVEL: 'DEBUG' } : {}) },
+    {
+      HERMES_HOME: orewaHome,
+      HERMES_ACP_EDIT_APPROVAL_DEFAULT: 'workspace_session',
+      ...(debugLogs ? { HERMES_LOG_LEVEL: 'DEBUG' } : {}),
+    },
     debugLogs,
   );
 

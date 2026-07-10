@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import tempfile
 from concurrent.futures import TimeoutError as FutureTimeout
@@ -50,7 +51,8 @@ _PERMISSION_REQUEST_IDS = count(1)
 _EDIT_SESSION_APPROVE_ALL = False
 
 # "Allow always" additionally persists across restarts via a small state file.
-_EDIT_ALWAYS_STATE_FILE = Path.home() / ".hermes" / "acp_edit_approval.json"
+# Respect HERMES_HOME so branded ACP forks keep independent approval state.
+_EDIT_ALWAYS_STATE_FILE = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes")) / "acp_edit_approval.json"
 
 
 def _always_approve_edits() -> bool:
