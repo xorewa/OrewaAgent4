@@ -98,7 +98,7 @@ export function applyVoiceRecordResponse(
 }
 
 export function useInputHandlers(ctx: InputHandlerContext): InputHandlerResult {
-  const { actions, composer, gateway, terminal, voice, wheelStep } = ctx
+  const { actions, composer, completionTabRef, gateway, terminal, voice, wheelStep } = ctx
   const { actions: cActions, refs: cRefs, state: cState } = composer
 
   const overlay = useStore($overlayState)
@@ -602,6 +602,7 @@ export function useInputHandlers(ctx: InputHandlerContext): InputHandlerResult {
             ? row.text.slice(1)
             : row.text
 
+        if (completionTabRef) completionTabRef.current = true
         cActions.setInput(cState.input.slice(0, cState.compReplace) + text)
       }
 
