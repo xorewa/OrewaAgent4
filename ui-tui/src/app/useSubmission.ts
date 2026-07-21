@@ -46,6 +46,10 @@ export function useSubmission(opts: UseSubmissionOptions) {
 
   const lastEmptyAt = useRef(0)
   const typingIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Tracks whether the user explicitly pressed Tab to accept a completion.
+  // Only when true will Enter apply the completion; auto-suggested completions
+  // (triggered by typing a path-like string) must not hijack Enter submission.
+  const tabAppliedRef = useRef(false)
 
   useEffect(() => {
     if (typingIdleTimer.current) {
@@ -301,7 +305,8 @@ export function useSubmission(opts: UseSubmissionOptions) {
 
   const submit = useCallback(
     (value: string) => {
-      if (composerState.completions.length) {
+      if (tabAppliedRef.current && composerState.completions.length) {
+        tabAppliedRef.current = false
         const row = composerState.completions[composerState.compIdx]
         const next = completionToApplyOnSubmit(value, row?.text, composerState.compReplace)
 
@@ -309,6 +314,7 @@ export function useSubmission(opts: UseSubmissionOptions) {
           return composerActions.setInput(next)
         }
       }
+      tabAppliedRef.current = false
 
       if (!value.trim() && !composerState.inputBuf.length) {
         const live = getUiState()
@@ -353,7 +359,7 @@ export function useSubmission(opts: UseSubmissionOptions) {
 
   submitRef.current = submit
 
-  return { dispatchSubmission, send, sendQueued, submit }
+  return { dispatchSubmission, send, sendQueued, submit, tabAppliedRef }
 }
 
 export interface UseSubmissionOptions {

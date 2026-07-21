@@ -684,7 +684,7 @@ export function useMainApp(gw: GatewayClient) {
 
   clipboardPasteRef.current = paste
 
-  const { dispatchSubmission, send, sendQueued, submit } = useSubmission({
+  const { dispatchSubmission, send, sendQueued, submit, tabAppliedRef } = useSubmission({
     appendMessage,
     composerActions,
     composerRefs,
@@ -731,6 +731,7 @@ export function useMainApp(gw: GatewayClient) {
       sys
     },
     composer: { actions: composerActions, refs: composerRefs, state: composerState },
+    completionTabRef: tabAppliedRef,
     gateway,
     terminal: { hasSelection, scrollRef, scrollWithSelection, selection, stdout },
     voice: {

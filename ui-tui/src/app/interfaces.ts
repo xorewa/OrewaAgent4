@@ -268,6 +268,7 @@ export interface InputHandlerContext {
     refs: ComposerRefs
     state: ComposerState
   }
+  completionTabRef?: MutableRefObject<boolean>
   gateway: GatewayServices
   terminal: {
     hasSelection: boolean
