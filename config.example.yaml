@@ -1,17 +1,17 @@
 model:
-  default: glm-5.2
-  provider: zai
-  base_url: https://api.z.ai/api/coding/paas/v4
+  default: mimo-v2.5-pro
+  provider: xiaomi
+  base_url: https://token-plan-sgp.xiaomimimo.com/v1
 agent:
   max_turns: 150
   reasoning_effort: medium
   api_max_retries: 1
 providers:
-  zai:
+  xiaomi:
     request_timeout_seconds: 300
     stale_timeout_seconds: 120
 streaming:
-  enabled: true
+  enabled: false
 terminal:
   timeout: 600
 code_execution:
@@ -19,3 +19,12 @@ code_execution:
   max_tool_calls: 200
 delegation:
   max_iterations: 200
+# Auxiliary vision provider — enables vision_analyze for models without native
+# vision (e.g. mimo-v2.5-pro). Falls back to OpenRouter Gemini Flash for image
+# analysis. 'auto' picks best available: OpenRouter -> Nous Portal -> main endpoint.
+auxiliary:
+  vision:
+    provider: "auto"
+    model: ""
+    timeout: 30
+    download_timeout: 30
